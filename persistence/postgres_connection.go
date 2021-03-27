@@ -2,14 +2,13 @@ package postgres
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"sync"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	log "github.com/sirupsen/logrus"
-	"github.com/zhanchengsong/LocalGuideUserService/model"
+	"github.io/zhanchengsong/LocalGuideUserService/model"
 )
 
 var (
@@ -23,18 +22,24 @@ var (
 var dbOnce sync.Once
 
 var clientInstance *gorm.DB
-
+var clientError error
 func ConnectDB() (*gorm.DB, error) {
-	dbURI := fmt.Sprintf("host=%s user=%s dbname=%s sslmode=disable password=%s", HOST, USERNAME, DATABASE, PASSWORD)
-	db, err := gorm.Open("postgres", dbURI)
-	if err != nil {
-		log.Error("DB connection failed")
-		return db, err
-	}
-	clientInstance = db
-	defer db.Close()
-	db.AutoMigrate(
-		&model.User{})
-	log.Info("Succesfully connected to db")
-	return clientInstance, err
+	dbOnce.Do(func() {
+		log.WithFields(log.Fields{
+			"source": "Postgres Gorm",
+		}).Info(fmt.Sprintf("Connecting to postgres at %s", HOST))
+		dbURI := fmt.Sprintf("host=%s user=%s dbname=%s sslmode=disable password=%s", HOST, USERNAME, DATABASE, PASSWORD)
+		db, err := gorm.Open("postgres", dbURI)
+		if err != nil {
+			log.Error("DB connection failed")
+			clientError = err
+		}
+		clientInstance = db
+		defer db.Close()
+		db.AutoMigrate(
+			&model.User{})
+		log.Info("Successfully connected to db")
+	})
+
+	return clientInstance, clientError
 }
