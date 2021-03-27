@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
+	log "github.com/sirupsen/logrus"
 	"github.com/zhanchengsong/LocalGuideUserService/model"
 )
 
@@ -17,17 +19,22 @@ var (
 	DATABASE = os.Getenv("POSTGRES_DATABASE")
 )
 
-func ConnectDB(username string, password string, databaseName string, databaseHost string) *gorm.DB {
+//Used to execute client creation procedure only once.
+var dbOnce sync.Once
+
+var clientInstance *gorm.DB
+
+func ConnectDB() (*gorm.DB, error) {
 	dbURI := fmt.Sprintf("host=%s user=%s dbname=%s sslmode=disable password=%s", HOST, USERNAME, DATABASE, PASSWORD)
 	db, err := gorm.Open("postgres", dbURI)
 	if err != nil {
-		log.Println(err)
-		log.Fatal("DB connection failed")
-		panic(err)
+		log.Error("DB connection failed")
+		return db, err
 	}
+	clientInstance = db
 	defer db.Close()
 	db.AutoMigrate(
 		&model.User{})
-	log.Print("Succesfully connected to db")
-	return db
+	log.Info("Succesfully connected to db")
+	return clientInstance, err
 }
