@@ -12,5 +12,5 @@ type User struct {
 	Email       string `json:"email",omitempty gorm:"type:varchar(100);unique_index"`
 	Password    string `json:"-",omitempty`
 	IconUrl     string `json:"iconUrl,omitempty"`
-	JWTToken    string `json:"jwtToken,omitempty"`
+	JWTToken    string `json:"jwtToken,omitempty" gorm:"-"`
 }

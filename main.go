@@ -6,8 +6,15 @@ import (
 )
 
 func main() {
-	_, err := postgress.ConnectDB()
+	db, err := postgress.ConnectDB()
+
 	if err != nil {
 		log.Error(err.Error())
 	}
+	_, err = postgress.CheckUserByUsername("TestUser")
+
+	if err != nil {
+		log.Error(err.Error())
+	}
+	defer db.Close()
 }

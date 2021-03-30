@@ -12,10 +12,10 @@ import (
 )
 
 var (
-	HOST     = os.Getenv("POSTGRES_HOST")
-	USERNAME = os.Getenv("POSTGRES_USERNAME")
-	PASSWORD = os.Getenv("POSTGRES_PASSWORD")
-	DATABASE = os.Getenv("POSTGRES_DATABASE")
+	HOST     = os.Getenv("PG_HOST")
+	USERNAME = os.Getenv("PG_USERNAME")
+	PASSWORD = os.Getenv("PG_PASSWORD")
+	DATABASE = os.Getenv("PG_DBNAME")
 )
 
 //Used to execute client creation procedure only once.
@@ -23,6 +23,7 @@ var dbOnce sync.Once
 
 var clientInstance *gorm.DB
 var clientError error
+
 func ConnectDB() (*gorm.DB, error) {
 	dbOnce.Do(func() {
 		log.WithFields(log.Fields{
@@ -33,9 +34,9 @@ func ConnectDB() (*gorm.DB, error) {
 		if err != nil {
 			log.Error("DB connection failed")
 			clientError = err
+			return
 		}
 		clientInstance = db
-		defer db.Close()
 		db.AutoMigrate(
 			&model.User{})
 		log.Info("Successfully connected to db")
