@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"net/http"
 
+	guuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.io/zhanchengsong/LocalGuideUserService/model"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -20,10 +22,13 @@ const (
 
 const (
 	PG_ERROR_NO_RECORD = "record not found"
+	PG_ERROR_CONNECT   = "cannot connect to db"
+	PG_ERROR_HASH      = "cannot hash"
+	PG_ERROR_CREATE    = "cannot create user"
+	PG_SUCCESS         = "success"
 )
 
-type DatabaseError struct {
-	error
+type DatabaseStatus struct {
 	Code    int
 	Message string
 	Reason  string
@@ -34,26 +39,25 @@ func getLogger() *log.Entry {
 	return pg_log
 }
 
-func (dbError DatabaseError) Error() string {
-	return dbError.Message
-}
-
-func CheckUserByUsername(username string) (bool, error) {
-	getLogger().Debug(fmt.Sprintf("Checking user existence with username: %s", username))
-	resultUser := model.User{}
+func SaveUser(user model.User) DatabaseStatus {
 	db, err := ConnectDB()
 	if err != nil {
-		getLogger().Error("Failed to get postgress connection")
-		return false, DatabaseError{Code: http.StatusInternalServerError, Message: err.Error(), Reason: CONNECTION}
+		getLogger().Error("Cannot connect to postgres")
+		return DatabaseStatus{Code: http.StatusInternalServerError, Message: "Cannot connec to db", Reason: PG_ERROR_CONNECT}
 	}
-	findResult := db.Where("username = ?", username).Find(&resultUser)
-	if findResult.Error != nil {
-		getLogger().Error(findResult.Error)
-		if findResult.Error.Error() == PG_ERROR_NO_RECORD {
-			return false, DatabaseError{Code: http.StatusNotFound, Message: "User not found", Reason: USERNAME_NOT_EXISTS}
-		}
-		return false, DatabaseError{Code: http.StatusInternalServerError, Message: findResult.Error.Error(), Reason: OTHER}
+	hashedPass, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		getLogger().Error("Cannot hash password")
+		return DatabaseStatus{Code: http.StatusInternalServerError, Message: "Cannot hash password", Reason: PG_ERROR_HASH}
 	}
-	return false, nil
-
+	// Replace clear text password with the hashed value
+	user.Password = string(hashedPass)
+	// Replace userId with uuid generated
+	user.UserId = guuid.NewString()
+	saveErr := db.Create(&user).Error
+	if saveErr != nil {
+		getLogger().Error(fmt.Sprintf("Cannot create user %s", saveErr.Error()))
+		return DatabaseStatus{Code: http.StatusConflict, Message: saveErr.Error(), Reason: PG_ERROR_CREATE}
+	}
+	return DatabaseStatus{Code: http.StatusCreated, Message: "Success", Reason: PG_SUCCESS}
 }

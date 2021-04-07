@@ -7,5 +7,6 @@ import (
 type Token struct {
 	DisplayName    string             `json:"displayName,omitempty"`
 	Username       string             `json:"username,omitempty"`
+	UserId         string             `json:"userId,omitempty"`
 	StandardClaims jwt.StandardClaims `json:"-"`
 }
