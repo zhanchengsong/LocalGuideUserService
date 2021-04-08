@@ -26,6 +26,7 @@ const (
 	PG_ERROR_HASH      = "cannot hash"
 	PG_ERROR_CREATE    = "cannot create user"
 	PG_SUCCESS         = "success"
+	PG_PASSWORD        = "wrong password"
 )
 
 type DatabaseStatus struct {
@@ -60,4 +61,28 @@ func SaveUser(user model.User) DatabaseStatus {
 		return DatabaseStatus{Code: http.StatusConflict, Message: saveErr.Error(), Reason: PG_ERROR_CREATE}
 	}
 	return DatabaseStatus{Code: http.StatusCreated, Message: "Success", Reason: PG_SUCCESS}
+}
+
+func GetUserByUsernameAndPassword(username string, password string) (user model.User, status DatabaseStatus) {
+	fetchedUser := model.User{}
+	db, err := ConnectDB()
+	if err != nil {
+		getLogger().Error("Cannot connect to postgres")
+		return fetchedUser, DatabaseStatus{Code: http.StatusInternalServerError, Message: "Cannot connect to db", Reason: PG_ERROR_CONNECT}
+	}
+
+	err = db.Where("username= ?", username).First(&fetchedUser).Error
+	if err != nil {
+		getLogger().Error(err.Error())
+		return fetchedUser, DatabaseStatus{Code: http.StatusNotFound, Message: err.Error(), Reason: PG_ERROR_NO_RECORD}
+	}
+
+	// Verify password
+	errf := bcrypt.CompareHashAndPassword([]byte(fetchedUser.Password), []byte(password))
+	fetchedUser.Password = ""
+	if errf != nil {
+		getLogger().Error(errf.Error())
+		return fetchedUser, DatabaseStatus{Code: http.StatusForbidden, Message: errf.Error(), Reason: PG_PASSWORD}
+	}
+	return fetchedUser, DatabaseStatus{Code: http.StatusOK, Message: "success", Reason: PG_SUCCESS}
 }

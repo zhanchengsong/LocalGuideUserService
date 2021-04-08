@@ -17,10 +17,10 @@ func (err DatabaseError) Error() string {
 type User struct {
 	gorm.Model  `json:"-"`
 	DisplayName string `json:"displayName,omitempty"`
-	UserId      string `json:"-,omitempty" gorm:"type:varchar(100);primaryKey"`
+	UserId      string `json:"userId,omitempty" gorm:"type:varchar(100);primaryKey"`
 	Username    string `json:"username,omitempty" gorm:"type:varchar(100);uniqueIndex"`
 	Email       string `json:"email,omitempty" gorm:"type:varchar(100);unique"`
-	Password    string `json:"-,omitempty"`
+	Password    string `json:"password,omitempty"`
 	IconUrl     string `json:"iconUrl,omitempty"`
 	JWTToken    string `json:"jwtToken,omitempty" gorm:"-"`
 }
