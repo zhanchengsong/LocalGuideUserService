@@ -23,5 +23,5 @@ type User struct {
 	Password     string `json:"password,omitempty"`
 	IconUrl      string `json:"iconUrl,omitempty"`
 	JWTToken     string `json:"jwtToken,omitempty" gorm:"-"`
-	RefreshToken string `json:"jwtToken,omitempty" gorm:"-"`
+	RefreshToken string `json:"refreshToken,omitempty" gorm:"-"`
 }

@@ -20,11 +20,11 @@ type handlerError struct {
 }
 
 type tokenRequestBody struct {
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refreshToken"`
 }
 
 type tokenResponseBody struct {
-	JWTToken string `json:"jwtToken"`
+	JWTToken     string `json:"jwtToken"`
 	RefreshToken string `json:"refreshToken"`
 }
 
@@ -76,7 +76,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Calculate token
-	jwt,rt,err := TokenizeUser(fetchedUser)
+	jwt, rt, err := TokenizeUser(fetchedUser)
 	if err != nil {
 		getLogger().Error(fmt.Sprintf("Cannot compute jwt token %s", err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -113,7 +113,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 	}
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		userId := claims["userId"].(string)
-		user, status:= postgres.GetUserByUserId(userId)
+		user, status := postgres.GetUserByUserId(userId)
 		if status.Code != http.StatusOK {
 			getLogger().Error(status.Message)
 			w.WriteHeader(http.StatusForbidden)
@@ -147,15 +147,15 @@ func TokenizeUser(user model.User) (jwtToken string, refreshToken string, err er
 	claims["displayName"] = user.DisplayName
 	claims["exp"] = time.Now().Add(time.Minute * 15).Unix()
 	tokenStr, err := token.SignedString(jwtSecret)
-	rtoken := jwt.New(jwt.SigningMethodES256)
+	rtoken := jwt.New(jwt.SigningMethodHS256)
 	rtClaims := rtoken.Claims.(jwt.MapClaims)
-	rtClaims["userId"] = user.UserId 
+	rtClaims["userId"] = user.UserId
 	rtClaims["exp"] = time.Now().Add(time.Hour * 24).Unix()
 	rtStr, err := rtoken.SignedString(jwtSecret)
 	if err != nil {
 		return "", "", err
 	}
-	return tokenStr,rtStr,nil
+	return tokenStr, rtStr, nil
 }
 
 func validateRegistrationRequest(user model.User) error {

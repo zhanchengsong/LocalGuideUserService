@@ -95,7 +95,7 @@ func GetUserByUserId(userId string) (model.User, DatabaseStatus) {
 		return fetchedUser, DatabaseStatus{Code: http.StatusInternalServerError, Message: "Cannot connect to db", Reason: PG_ERROR_CONNECT}
 	}
 
-	err = db.Where("userId= ?", userId).First(&fetchedUser).Error
+	err = db.Where("user_id= ?", userId).First(&fetchedUser).Error
 	if err != nil {
 		getLogger().Error(err.Error())
 		return fetchedUser, DatabaseStatus{Code: http.StatusNotFound, Message: err.Error(), Reason: PG_ERROR_NO_RECORD}
