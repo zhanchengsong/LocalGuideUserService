@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
@@ -26,7 +25,7 @@ func main() {
 	}
 	defer db.Close()
 
-	port := os.Getenv("SERVICE_PORT")
+	port := "8100"
 	router := mux.NewRouter().StrictSlash(true)
 	router.Use(commonMiddleware)
 	router.HandleFunc("/user", handlers.CreateUser).Methods("POST")

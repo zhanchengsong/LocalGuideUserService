@@ -86,3 +86,20 @@ func GetUserByUsernameAndPassword(username string, password string) (user model.
 	}
 	return fetchedUser, DatabaseStatus{Code: http.StatusOK, Message: "success", Reason: PG_SUCCESS}
 }
+
+func GetUserByUserId(userId string) (model.User, DatabaseStatus) {
+	fetchedUser := model.User{}
+	db, err := ConnectDB()
+	if err != nil {
+		getLogger().Error("Cannot connect to postgres")
+		return fetchedUser, DatabaseStatus{Code: http.StatusInternalServerError, Message: "Cannot connect to db", Reason: PG_ERROR_CONNECT}
+	}
+
+	err = db.Where("userId= ?", userId).First(&fetchedUser).Error
+	if err != nil {
+		getLogger().Error(err.Error())
+		return fetchedUser, DatabaseStatus{Code: http.StatusNotFound, Message: err.Error(), Reason: PG_ERROR_NO_RECORD}
+	}
+	fetchedUser.Password = ""
+	return fetchedUser, DatabaseStatus{Code: http.StatusOK, Message: "success", Reason: PG_SUCCESS}
+}
