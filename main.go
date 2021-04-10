@@ -30,6 +30,7 @@ func main() {
 	router.Use(commonMiddleware)
 	router.HandleFunc("/user", handlers.CreateUser).Methods("POST")
 	router.HandleFunc("/login", handlers.LoginUser).Methods("POST")
+	router.HandleFunc("/token", handlers.RefreshToken).Methods("POST")
 	log.Info(fmt.Sprintf("Service is up and running on port %s", port))
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), router))
 }
