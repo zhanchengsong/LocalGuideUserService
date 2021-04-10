@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: CI Docker
+name: CI Docker to DigitalOcean
 
 # Controls when the action will run. 
 on:
@@ -32,4 +32,17 @@ jobs:
       -
         name: Image digest
         run: echo ${{ steps.docker_build.outputs.digest }}
-      
+      - 
+        name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DO_ACCESS_TOKEN }}
+      - 
+        name: Save DigitalOcean kubeconfig
+        run: doctl kubernetes cluster kubeconfig save k8s-localguide-dev
+      - 
+        name: Deploy to DigitalOcean Kubernetes
+        run: kubectl rollout restart deployment userservice
+      - 
+        name: Verify deployment
+        run: kubectl rollout status deployment/userservice
