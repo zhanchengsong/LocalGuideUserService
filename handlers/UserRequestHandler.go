@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.io/zhanchengsong/LocalGuideUserService/transferObject"
 	"net/http"
 	"os"
 	"time"
+
+	"github.io/zhanchengsong/LocalGuideUserService/transferObject"
 
 	"github.com/dgrijalva/jwt-go"
 	log "github.com/sirupsen/logrus"
@@ -92,11 +93,12 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 // @Tags login
 // @Accept  json
 // @Produce  json
-// @Param user body transferObject.UserLoginBody true "Create user"
+// @Param user body transferObject.UserLoginBody true "Login user"
 // @Success 200 {object} transferObject.UserResponseBody
 // @Failure 404 {object} handlerError
 // @Failure 500 {object} handlerError
-// @Router /user [login]
+// @Failure 403 {object} handlerError
+// @Router /login [post]
 func LoginUser(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	getLogger().Info("Handling login user")
@@ -130,6 +132,18 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// RefreshToken godoc
+// @Summary Referesh JWT Token using the refresh token
+// @Description Use referesh token to obtain new jwt token
+// @Tags token
+// @Accept  json
+// @Produce  json
+// @Param user body TokenRequestBody true "RefreshToken"
+// @Success 200 {object} TokenResponseBody
+// @Failure 404 {object} handlerError
+// @Failure 500 {object} handlerError
+// @Failure 403 {object} handlerError
+// @Router /login [post]
 func RefreshToken(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	getLogger().Info("Handling refresh token")
@@ -189,6 +203,9 @@ func TokenizeUser(user model.User) (jwtToken string, refreshToken string, err er
 	claims["displayName"] = user.DisplayName
 	claims["exp"] = time.Now().Add(time.Minute * 15).Unix()
 	tokenStr, err := token.SignedString(jwtSecret)
+	if err != nil {
+		return "", "", err
+	}
 	rtoken := jwt.New(jwt.SigningMethodHS256)
 	rtClaims := rtoken.Claims.(jwt.MapClaims)
 	rtClaims["userId"] = user.UserId
