@@ -8,6 +8,8 @@ import (
 	"os"
 	"time"
 
+	"github.io/zhanchengsong/LocalGuideUserService/transferObject"
+
 	"github.com/dgrijalva/jwt-go"
 	log "github.com/sirupsen/logrus"
 	"github.io/zhanchengsong/LocalGuideUserService/model"
@@ -19,24 +21,31 @@ type handlerError struct {
 	Reason  string
 }
 
-type tokenRequestBody struct {
+type TokenRequestBody struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
-type tokenResponseBody struct {
+type TokenResponseBody struct {
 	JWTToken     string `json:"jwtToken"`
 	RefreshToken string `json:"refreshToken"`
 }
 
-const (
-	ERROR_EMPTY = "Empty Value"
-)
-
 func getLogger() *log.Entry {
-	handler_log := log.WithFields(log.Fields{"source": "User Request Handler"})
-	return handler_log
+	handlerLog := log.WithFields(log.Fields{"source": "User Request Handler"})
+	return handlerLog
 }
 
+// CreateUser godoc
+// @Summary Create a user
+// @Description Create a user profile
+// @Tags users
+// @Accept  json
+// @Produce  json
+// @Param user body transferObject.UserRegisterBody true "Create user"
+// @Success 201 {object} transferObject.UserResponseBody
+// @Failure 409 {object} handlerError
+// @Failure 500 {object} handlerError
+// @Router /user [post]
 func CreateUser(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	getLogger().Info("Handling create user")
@@ -46,33 +55,61 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		getLogger().Error(fmt.Sprintf("Error when creating user: %s", err.Error()))
 		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: err.Error(), Reason: "validation"})
 		return
 	}
-	status := postgres.SaveUser(*user)
+	savedUser, status := postgres.SaveUser(*user)
 	if status.Code != http.StatusCreated {
 		getLogger().Error(fmt.Sprintf("Error when creating user: %s", status.Message))
+		w.Header().Add("content-type", "application/json")
 		w.WriteHeader(status.Code)
-		json.NewEncoder(w).Encode(status)
+		json.NewEncoder(w).Encode(handlerError{Message: status.Message, Reason: status.Reason})
 		return
 	}
-	user.Password = ""
+	savedUser.Password = ""
+	// Create the token at the same time
+	jwt, rt, err := TokenizeUser(savedUser)
+	if err != nil {
+		getLogger().Error(fmt.Sprintf("Cannot compute jwt token %s", err.Error()))
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Header().Add("content-type", "application/json")
+		json.NewEncoder(w).Encode(handlerError{Message: "Cannot compute jwt token", Reason: err.Error()})
+		return
+	}
+
+	savedUser.JWTToken = jwt
+	savedUser.RefreshToken = rt
 	w.WriteHeader(status.Code)
-	json.NewEncoder(w).Encode(user)
+	w.Header().Add("content-type", "application/json")
+	json.NewEncoder(w).Encode(savedUser)
 	elapsed := time.Since(start).Milliseconds()
 	getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
 }
 
+// LoginUser godoc
+// @Summary Login a user and obtain jwtToken/refreshToken
+// @Description Takes in username and password to assign token
+// @Tags login
+// @Accept  json
+// @Produce  json
+// @Param user body transferObject.UserLoginBody true "Login user"
+// @Success 200 {object} transferObject.UserResponseBody
+// @Failure 404 {object} handlerError
+// @Failure 500 {object} handlerError
+// @Failure 403 {object} handlerError
+// @Router /login [post]
 func LoginUser(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	getLogger().Info("Handling login user")
-	user := &model.User{}
-	json.NewDecoder(r.Body).Decode(user)
-	fetchedUser, status := postgres.GetUserByUsernameAndPassword(user.Username, user.Password)
+	login := &transferObject.UserLoginBody{}
+	json.NewDecoder(r.Body).Decode(login)
+	fetchedUser, status := postgres.GetUserByUsernameAndPassword(login.Username, login.Password)
 	if status.Code != http.StatusOK {
 		getLogger().Error(fmt.Sprintf("Error when logining user %s", status.Message))
 		w.WriteHeader(status.Code)
-		json.NewEncoder(w).Encode(status)
+		w.Header().Add("content-type", "application/json")
+		json.NewEncoder(w).Encode(handlerError{Message: status.Message, Reason: status.Reason})
 		return
 	}
 	// Calculate token
@@ -80,6 +117,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		getLogger().Error(fmt.Sprintf("Cannot compute jwt token %s", err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
+		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: "Cannot compute jwt token", Reason: err.Error()})
 		return
 	}
@@ -87,16 +125,29 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 	fetchedUser.JWTToken = jwt
 	fetchedUser.RefreshToken = rt
 	w.WriteHeader(http.StatusOK)
+	w.Header().Add("content-type", "application/json")
 	json.NewEncoder(w).Encode(fetchedUser)
 	elapsed := time.Since(start).Milliseconds()
 	getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
 
 }
 
+// RefreshToken godoc
+// @Summary Referesh JWT Token using the refresh token
+// @Description Use referesh token to obtain new jwt token
+// @Tags token
+// @Accept  json
+// @Produce  json
+// @Param user body TokenRequestBody true "RefreshToken"
+// @Success 200 {object} TokenResponseBody
+// @Failure 404 {object} handlerError
+// @Failure 500 {object} handlerError
+// @Failure 403 {object} handlerError
+// @Router /login [post]
 func RefreshToken(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	getLogger().Info("Handling refresh token")
-	tokenRequest := tokenRequestBody{}
+	tokenRequest := TokenRequestBody{}
 	json.NewDecoder(r.Body).Decode(&tokenRequest)
 	token, err := jwt.Parse(tokenRequest.RefreshToken, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
@@ -108,6 +159,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		getLogger().Error(err.Error())
 		w.WriteHeader(http.StatusForbidden)
+		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: "Error parsing refresh token", Reason: "Refresh Token"})
 		return
 	}
@@ -117,6 +169,7 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		if status.Code != http.StatusOK {
 			getLogger().Error(status.Message)
 			w.WriteHeader(http.StatusForbidden)
+			w.Header().Add("content-type", "application/json")
 			json.NewEncoder(w).Encode(handlerError{Message: "Error parsing refresh token", Reason: "Refresh Token"})
 			return
 		}
@@ -124,16 +177,19 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			getLogger().Error(err.Error())
 			w.WriteHeader(http.StatusForbidden)
+			w.Header().Add("content-type", "application/json")
 			json.NewEncoder(w).Encode(handlerError{Message: "Error parsing refresh token", Reason: "Refresh Token"})
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(tokenResponseBody{JWTToken: jwtToken, RefreshToken: rt})
+		w.Header().Add("content-type", "application/json")
+		json.NewEncoder(w).Encode(TokenResponseBody{JWTToken: jwtToken, RefreshToken: rt})
 		elapsed := time.Since(start).Milliseconds()
 		getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
 	} else {
 		getLogger().Error("cannot parse jwt claims")
 		w.WriteHeader(http.StatusForbidden)
+		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: "Error parsing claims", Reason: "Refresh Token"})
 	}
 }
@@ -147,6 +203,9 @@ func TokenizeUser(user model.User) (jwtToken string, refreshToken string, err er
 	claims["displayName"] = user.DisplayName
 	claims["exp"] = time.Now().Add(time.Minute * 15).Unix()
 	tokenStr, err := token.SignedString(jwtSecret)
+	if err != nil {
+		return "", "", err
+	}
 	rtoken := jwt.New(jwt.SigningMethodHS256)
 	rtClaims := rtoken.Claims.(jwt.MapClaims)
 	rtClaims["userId"] = user.UserId

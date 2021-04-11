@@ -40,16 +40,16 @@ func getLogger() *log.Entry {
 	return pg_log
 }
 
-func SaveUser(user model.User) DatabaseStatus {
+func SaveUser(user model.User) (model.User, DatabaseStatus) {
 	db, err := ConnectDB()
 	if err != nil {
 		getLogger().Error("Cannot connect to postgres")
-		return DatabaseStatus{Code: http.StatusInternalServerError, Message: "Cannot connec to db", Reason: PG_ERROR_CONNECT}
+		return model.User{},DatabaseStatus{Code: http.StatusInternalServerError, Message: "Cannot connec to db", Reason: PG_ERROR_CONNECT}
 	}
 	hashedPass, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		getLogger().Error("Cannot hash password")
-		return DatabaseStatus{Code: http.StatusInternalServerError, Message: "Cannot hash password", Reason: PG_ERROR_HASH}
+		return model.User{},DatabaseStatus{Code: http.StatusInternalServerError, Message: "Cannot hash password", Reason: PG_ERROR_HASH}
 	}
 	// Replace clear text password with the hashed value
 	user.Password = string(hashedPass)
@@ -58,9 +58,10 @@ func SaveUser(user model.User) DatabaseStatus {
 	saveErr := db.Create(&user).Error
 	if saveErr != nil {
 		getLogger().Error(fmt.Sprintf("Cannot create user %s", saveErr.Error()))
-		return DatabaseStatus{Code: http.StatusConflict, Message: saveErr.Error(), Reason: PG_ERROR_CREATE}
+		return model.User{},DatabaseStatus{Code: http.StatusConflict, Message: saveErr.Error(), Reason: PG_ERROR_CREATE}
 	}
-	return DatabaseStatus{Code: http.StatusCreated, Message: "Success", Reason: PG_SUCCESS}
+	user.Password = ""
+	return user, DatabaseStatus{Code: http.StatusCreated, Message: "Success", Reason: PG_SUCCESS}
 }
 
 func GetUserByUsernameAndPassword(username string, password string) (user model.User, status DatabaseStatus) {

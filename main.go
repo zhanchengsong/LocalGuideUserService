@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	httpSwagger "github.com/swaggo/http-swagger"
+	_ "github.io/zhanchengsong/LocalGuideUserService/docs"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -10,13 +12,14 @@ import (
 	postgress "github.io/zhanchengsong/LocalGuideUserService/persistence"
 )
 
-func commonMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "application/json")
-		next.ServeHTTP(w, r)
-	})
-}
 
+// @title User API
+// @version 1.0.0
+// @description Service for user registration, login and jwtToken refresh
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+// @host auth.zhancheng.dev
+// @BasePath /
 func main() {
 	db, err := postgress.ConnectDB()
 
@@ -26,11 +29,12 @@ func main() {
 	defer db.Close()
 
 	port := "8100"
-	router := mux.NewRouter().StrictSlash(true)
-	router.Use(commonMiddleware)
+	router := mux.NewRouter()
+	router.PathPrefix("/swagger").Handler(httpSwagger.WrapHandler)
 	router.HandleFunc("/user", handlers.CreateUser).Methods("POST")
 	router.HandleFunc("/login", handlers.LoginUser).Methods("POST")
 	router.HandleFunc("/token", handlers.RefreshToken).Methods("POST")
+
 	log.Info(fmt.Sprintf("Service is up and running on port %s", port))
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), router))
 }
