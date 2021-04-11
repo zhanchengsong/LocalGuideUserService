@@ -143,7 +143,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {object} handlerError
 // @Failure 500 {object} handlerError
 // @Failure 403 {object} handlerError
-// @Router /login [post]
+// @Router /token [post]
 func RefreshToken(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 	getLogger().Info("Handling refresh token")
