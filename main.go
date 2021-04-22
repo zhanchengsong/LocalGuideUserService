@@ -2,16 +2,16 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+
 	httpSwagger "github.com/swaggo/http-swagger"
 	_ "github.io/zhanchengsong/LocalGuideUserService/docs"
-	"net/http"
 
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.io/zhanchengsong/LocalGuideUserService/handlers"
 	postgress "github.io/zhanchengsong/LocalGuideUserService/persistence"
 )
-
 
 // @title User API
 // @version 1.0.0
@@ -32,6 +32,7 @@ func main() {
 	router := mux.NewRouter()
 	router.PathPrefix("/swagger").Handler(httpSwagger.WrapHandler)
 	router.HandleFunc("/user", handlers.CreateUser).Methods("POST")
+	router.HandleFunc("/users", handlers.FindUserByUsername).Methods("GET")
 	router.HandleFunc("/login", handlers.LoginUser).Methods("POST")
 	router.HandleFunc("/token", handlers.RefreshToken).Methods("POST")
 

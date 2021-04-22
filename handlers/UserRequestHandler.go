@@ -30,6 +30,10 @@ type TokenResponseBody struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
+type UsersResponseBody struct {
+	Users []model.User `json:"users"`
+}
+
 func getLogger() *log.Entry {
 	handlerLog := log.WithFields(log.Fields{"source": "User Request Handler"})
 	return handlerLog
@@ -38,7 +42,7 @@ func getLogger() *log.Entry {
 // CreateUser godoc
 // @Summary Create a user
 // @Description Create a user profile
-// @Tags users
+// @Tags Create a user
 // @Accept  json
 // @Produce  json
 // @Param user body transferObject.UserRegisterBody true "Create user"
@@ -90,7 +94,7 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 // LoginUser godoc
 // @Summary Login a user and obtain jwtToken/refreshToken
 // @Description Takes in username and password to assign token
-// @Tags login
+// @Tags Log in a user
 // @Accept  json
 // @Produce  json
 // @Param user body transferObject.UserLoginBody true "Login user"
@@ -135,7 +139,7 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 // RefreshToken godoc
 // @Summary Referesh JWT Token using the refresh token
 // @Description Use referesh token to obtain new jwt token
-// @Tags token
+// @Tags Refresh JWT Token
 // @Accept  json
 // @Produce  json
 // @Param user body TokenRequestBody true "RefreshToken"
@@ -192,6 +196,39 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: "Error parsing claims", Reason: "Refresh Token"})
 	}
+}
+
+// FindUserByUsername godoc
+// @Summary Get a list of users with username that contains the string provided
+// @Description Search for users with username that is partial matching the string
+// @Tags Find user by partial matching
+// @Produce json
+// @Param username query string true "Term for partial matching username"
+// @Success 200 {object} transferObject.UsersResponseBody
+// @Failure 404 {object} handlerError
+// @Failure 500 {object} handlerError
+// @Router /users [GET]
+func FindUserByUsername(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	getLogger().Info("Handling find user by matching username")
+	username := r.URL.Query()["username"][0]
+	users, status := postgres.SearchUsersByUsername(username)
+
+	if status.Code != http.StatusOK {
+		getLogger().Error(fmt.Sprintf("Error when finding user %s", status.Message))
+		w.WriteHeader(status.Code)
+		w.Header().Add("content-type", "application/json")
+		json.NewEncoder(w).Encode(handlerError{Message: status.Message, Reason: status.Reason})
+		return
+	}
+	for i := range users {
+		users[i].Password = ""
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("content-type", "application/json")
+	json.NewEncoder(w).Encode(UsersResponseBody{Users: users})
+	elapsed := time.Since(start).Milliseconds()
+	getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
 }
 
 func TokenizeUser(user model.User) (jwtToken string, refreshToken string, err error) {
