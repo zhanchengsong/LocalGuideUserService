@@ -35,6 +35,8 @@ func main() {
 	router.HandleFunc("/users", handlers.FindUserByUsername).Methods("GET")
 	router.HandleFunc("/login", handlers.LoginUser).Methods("POST")
 	router.HandleFunc("/token", handlers.RefreshToken).Methods("POST")
+	router.HandleFunc("/countByUsername", handlers.CountByUsername).Methods("GET")
+	router.HandleFunc("/countByDisplayName", handlers.CountByDisplayName).Methods("GET")
 
 	log.Info(fmt.Sprintf("Service is up and running on port %s", port))
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), router))

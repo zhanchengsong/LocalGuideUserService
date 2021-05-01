@@ -1,0 +1,265 @@
+basePath: /
+definitions:
+  handlers.TokenRequestBody:
+    properties:
+      refreshToken:
+        type: string
+    type: object
+  handlers.TokenResponseBody:
+    properties:
+      jwtToken:
+        type: string
+      refreshToken:
+        type: string
+    type: object
+  handlers.UserCountResponseBody:
+    properties:
+      count:
+        type: integer
+    type: object
+  handlers.handlerError:
+    properties:
+      message:
+        type: string
+      reason:
+        type: string
+    type: object
+  transferObject.User:
+    properties:
+      displayName:
+        type: string
+      email:
+        type: string
+      username:
+        type: string
+    type: object
+  transferObject.UserLoginBody:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  transferObject.UserRegisterBody:
+    properties:
+      displayName:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  transferObject.UserResponseBody:
+    properties:
+      displayName:
+        type: string
+      email:
+        type: string
+      jwtToken:
+        type: string
+      refreshToken:
+        type: string
+      userId:
+        type: string
+      username:
+        type: string
+    type: object
+  transferObject.UsersResponseBody:
+    properties:
+      users:
+        items:
+          $ref: '#/definitions/transferObject.User'
+        type: array
+    type: object
+host: auth.zhancheng.dev
+info:
+  contact: {}
+  description: Service for user registration, login and jwtToken refresh
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: User API
+  version: 1.0.0
+paths:
+  /countByDisplayName:
+    get:
+      description: Return total count of users with the given display name
+      parameters:
+      - description: exact display name string to search
+        in: query
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UserCountResponseBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.handlerError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.handlerError'
+      summary: Get count of users in the database by displayName
+      tags:
+      - Count user by display name
+  /countByUsername:
+    get:
+      description: Return total count of users with the given username
+      parameters:
+      - description: exact username string to search
+        in: query
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UserCountResponseBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.handlerError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.handlerError'
+      summary: Get count of users in the database by username
+      tags:
+      - Count user by username
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Takes in username and password to assign token
+      parameters:
+      - description: Login user
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/transferObject.UserLoginBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/transferObject.UserResponseBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.handlerError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.handlerError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.handlerError'
+      summary: Login a user and obtain jwtToken/refreshToken
+      tags:
+      - Log in a user
+  /token:
+    post:
+      consumes:
+      - application/json
+      description: Use referesh token to obtain new jwt token
+      parameters:
+      - description: RefreshToken
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.TokenRequestBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.TokenResponseBody'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/handlers.handlerError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.handlerError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.handlerError'
+      summary: Referesh JWT Token using the refresh token
+      tags:
+      - Refresh JWT Token
+  /user:
+    post:
+      consumes:
+      - application/json
+      description: Create a user profile
+      parameters:
+      - description: Create user
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/transferObject.UserRegisterBody'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/transferObject.UserResponseBody'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/handlers.handlerError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.handlerError'
+      summary: Create a user
+      tags:
+      - Create a user
+  /users:
+    get:
+      description: Search for users with username that is partial matching the string
+      parameters:
+      - description: Term for partial matching username
+        in: query
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/transferObject.UsersResponseBody'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/handlers.handlerError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handlers.handlerError'
+      summary: Get a list of users with username that contains the string provided
+      tags:
+      - Find user by partial matching
+swagger: "2.0"

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.io/zhanchengsong/LocalGuideUserService/transferObject"
@@ -32,6 +33,10 @@ type TokenResponseBody struct {
 
 type UsersResponseBody struct {
 	Users []model.User `json:"users"`
+}
+
+type UserCountResponseBody struct {
+	Count int64 `json:"count"`
 }
 
 func getLogger() *log.Entry {
@@ -227,6 +232,79 @@ func FindUserByUsername(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Add("content-type", "application/json")
 	json.NewEncoder(w).Encode(UsersResponseBody{Users: users})
+	elapsed := time.Since(start).Milliseconds()
+	getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
+}
+
+// CountByUsername godoc
+// @Summary Get count of users in the database by username
+// @Description Return total count of users with the given username
+// @Tags Count user by username
+// @Produce json
+// @Param username query string true "exact username string to search"
+// @Success 200 {object} UserCountResponseBody
+// @Failure 404 {object} handlerError
+// @Failure 500 {object} handlerError
+// @Router /countByUsername [GET]
+func CountByUsername(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	getLogger().Info("Counting user by username")
+	username := r.URL.Query()["username"][0]
+	if len(username) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Add("content-type", "application/json")
+		json.NewEncoder(w).Encode(handlerError{Message: "displayName not in param", Reason: "MISSING_PARAM"})
+	}
+	username = strings.TrimSpace(username)
+	count, status := postgres.CountByUsername(username)
+
+	if status.Code != http.StatusOK {
+		getLogger().Error(fmt.Sprintf("Error when searching username %s", status.Message))
+		w.WriteHeader(status.Code)
+		w.Header().Add("content-type", "application/json")
+		json.NewEncoder(w).Encode(handlerError{Message: status.Message, Reason: status.Reason})
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("content-type", "application/json")
+	json.NewEncoder(w).Encode(UserCountResponseBody{Count: count})
+	elapsed := time.Since(start).Milliseconds()
+	getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
+}
+
+// CountByDisplayName godoc
+// @Summary Get count of users in the database by displayName
+// @Description Return total count of users with the given display name
+// @Tags Count user by display name
+// @Produce json
+// @Param displayName query string true "exact display name string to search"
+// @Success 200 {object} UserCountResponseBody
+// @Failure 404 {object} handlerError
+// @Failure 500 {object} handlerError
+// @Router /countByDisplayName [GET]
+func CountByDisplayName(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	getLogger().Info("Counting user by displayName")
+	dname := r.URL.Query()["displayName"][0]
+	if len(dname) == 0 {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Add("content-type", "application/json")
+		json.NewEncoder(w).Encode(handlerError{Message: "displayName not in param", Reason: "MISSING_PARAM"})
+		return
+	}
+	dname = strings.TrimSpace(dname)
+	count, status := postgres.CountByDisplayName(dname)
+
+	if status.Code != http.StatusOK {
+		getLogger().Error(fmt.Sprintf("Error when searching displayName %s", status.Message))
+		w.WriteHeader(status.Code)
+		w.Header().Add("content-type", "application/json")
+		json.NewEncoder(w).Encode(handlerError{Message: status.Message, Reason: status.Reason})
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("content-type", "application/json")
+	json.NewEncoder(w).Encode(UserCountResponseBody{Count: count})
 	elapsed := time.Since(start).Milliseconds()
 	getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
 }

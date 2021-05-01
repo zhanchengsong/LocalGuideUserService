@@ -1,10 +1,12 @@
 package postgres
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
 	guuid "github.com/google/uuid"
+	"github.com/jinzhu/gorm"
 	log "github.com/sirupsen/logrus"
 	"github.io/zhanchengsong/LocalGuideUserService/model"
 	"golang.org/x/crypto/bcrypt"
@@ -27,6 +29,7 @@ const (
 	PG_ERROR_CREATE    = "cannot create user"
 	PG_SUCCESS         = "success"
 	PG_PASSWORD        = "wrong password"
+	PG_ERROR_GENERIC   = "generic error"
 )
 
 type DatabaseStatus struct {
@@ -75,7 +78,10 @@ func GetUserByUsernameAndPassword(username string, password string) (user model.
 	err = db.Where("username= ?", username).First(&fetchedUser).Error
 	if err != nil {
 		getLogger().Error(err.Error())
-		return fetchedUser, DatabaseStatus{Code: http.StatusNotFound, Message: err.Error(), Reason: PG_ERROR_NO_RECORD}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fetchedUser, DatabaseStatus{Code: http.StatusNotFound, Message: err.Error(), Reason: PG_ERROR_NO_RECORD}
+		}
+		return fetchedUser, DatabaseStatus{Code: http.StatusInternalServerError, Message: err.Error(), Reason: PG_ERROR_GENERIC}
 	}
 
 	// Verify password
@@ -99,7 +105,10 @@ func GetUserByUserId(userId string) (model.User, DatabaseStatus) {
 	err = db.Where("user_id= ?", userId).First(&fetchedUser).Error
 	if err != nil {
 		getLogger().Error(err.Error())
-		return fetchedUser, DatabaseStatus{Code: http.StatusNotFound, Message: err.Error(), Reason: PG_ERROR_NO_RECORD}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fetchedUser, DatabaseStatus{Code: http.StatusNotFound, Message: err.Error(), Reason: PG_ERROR_GENERIC}
+		}
+		return fetchedUser, DatabaseStatus{Code: http.StatusInternalServerError, Message: err.Error(), Reason: PG_ERROR_GENERIC}
 	}
 	fetchedUser.Password = ""
 	return fetchedUser, DatabaseStatus{Code: http.StatusOK, Message: "success", Reason: PG_SUCCESS}
@@ -115,8 +124,50 @@ func SearchUsersByUsername(username string) ([]model.User, DatabaseStatus) {
 
 	err = db.Where("username LIKE ?", fmt.Sprintf("%%%s%%", username)).Find(&users).Error
 	if err != nil {
+
 		getLogger().Error(err.Error())
-		return users, DatabaseStatus{Code: http.StatusNotFound, Message: err.Error(), Reason: PG_ERROR_NO_RECORD}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return users, DatabaseStatus{Code: http.StatusNotFound, Message: err.Error(), Reason: PG_ERROR_NO_RECORD}
+		}
+		return users, DatabaseStatus{Code: http.StatusInternalServerError, Message: err.Error(), Reason: PG_ERROR_GENERIC}
 	}
 	return users, DatabaseStatus{Code: http.StatusOK, Message: "success", Reason: PG_SUCCESS}
+}
+
+func CountByUsername(username string) (int64, DatabaseStatus) {
+	var testUser = model.User{}
+	db, err := ConnectDB()
+	if err != nil {
+		getLogger().Error("Cannot connect to postgres")
+	}
+	dbResult := db.Where("username= ?", username).First(&testUser)
+	err = dbResult.Error
+	if err != nil {
+		getLogger().Error(err.Error())
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, DatabaseStatus{Code: http.StatusOK, Message: "success", Reason: PG_SUCCESS}
+		}
+		return 0, DatabaseStatus{Code: http.StatusInternalServerError, Message: err.Error(), Reason: PG_ERROR_GENERIC}
+	}
+	count := dbResult.RowsAffected
+	return count, DatabaseStatus{Code: http.StatusOK, Message: "success", Reason: PG_SUCCESS}
+}
+
+func CountByDisplayName(displayName string) (int64, DatabaseStatus) {
+	var testUser = model.User{}
+	db, err := ConnectDB()
+	if err != nil {
+		getLogger().Error("Cannot connect to postgres")
+	}
+	dbResult := db.Where("display_name= ?", displayName).First(&testUser)
+	err = dbResult.Error
+	if err != nil {
+		getLogger().Error(err.Error())
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, DatabaseStatus{Code: http.StatusOK, Message: "success", Reason: PG_SUCCESS}
+		}
+		return 0, DatabaseStatus{Code: http.StatusInternalServerError, Message: err.Error(), Reason: PG_ERROR_GENERIC}
+	}
+	count := dbResult.RowsAffected
+	return count, DatabaseStatus{Code: http.StatusOK, Message: "success", Reason: PG_SUCCESS}
 }
