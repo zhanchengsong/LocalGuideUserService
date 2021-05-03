@@ -96,6 +96,45 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
 }
 
+// UpdateUser godoc
+// @Summary Update an existing user
+// @Description Update an existing user profile with provided body
+// @Tags Update user
+// @Accept  json
+// @Produce  json
+// @Param userId query string true "User id to update profile"
+// @Param user body transferObject.UserUpdateBody true "Body to update"
+// @Success 200 {object} transferObject.UserUpdateBody
+// @Failure 409 {object} handlerError
+// @Failure 500 {object} handlerError
+// @Router /user [patch]
+func UpdateUser(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	getLogger().Info("Handling update user")
+	userId := r.URL.Query()["userId"][0]
+	if userId == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Header().Add("content-type", "application/json")
+		json.NewEncoder(w).Encode(handlerError{Message: "Missing userId in path", Reason: "parameter"})
+		return
+	}
+	updateUser := &transferObject.UserUpdateBody{}
+	json.NewDecoder(r.Body).Decode(updateUser)
+	updateResult, status := postgres.UpdateUser(*updateUser, userId)
+	if status.Code != http.StatusOK {
+		getLogger().Error(fmt.Sprintf("Error when updating user: %s", status.Message))
+		w.Header().Add("content-type", "application/json")
+		w.WriteHeader(status.Code)
+		json.NewEncoder(w).Encode(handlerError{Message: status.Message, Reason: status.Reason})
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("content-type", "application/json")
+	json.NewEncoder(w).Encode(updateResult)
+	elapsed := time.Since(start).Milliseconds()
+	getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
+}
+
 // LoginUser godoc
 // @Summary Login a user and obtain jwtToken/refreshToken
 // @Description Takes in username and password to assign token
