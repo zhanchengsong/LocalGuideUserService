@@ -9,6 +9,13 @@ type UserRegisterBody struct {
 	Password    string `json:"password,omitempty"`
 }
 
+type UserUpdateBody struct {
+	DisplayName string `json:"displayName,omitempty"`
+	Username    string `json:"username,omitempty"`
+	Email       string `json:"email,omitempty"`
+	ImageId     string `json:"imageId,omitempty"`
+}
+
 type UserLoginBody struct {
 	Username string `json:"username,omitempty"`
 	Password string `json:"password,omitempty"`

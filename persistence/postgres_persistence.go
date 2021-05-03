@@ -9,6 +9,7 @@ import (
 	"github.com/jinzhu/gorm"
 	log "github.com/sirupsen/logrus"
 	"github.io/zhanchengsong/LocalGuideUserService/model"
+	"github.io/zhanchengsong/LocalGuideUserService/transferObject"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -65,6 +66,26 @@ func SaveUser(user model.User) (model.User, DatabaseStatus) {
 	}
 	user.Password = ""
 	return user, DatabaseStatus{Code: http.StatusCreated, Message: "Success", Reason: PG_SUCCESS}
+}
+
+func UpdateUser(updateUser transferObject.UserUpdateBody, userId string) (transferObject.UserUpdateBody, DatabaseStatus) {
+	db, err := ConnectDB()
+	if err != nil {
+		getLogger().Error("Cannot connect to postgres")
+		return transferObject.UserUpdateBody{}, DatabaseStatus{Code: http.StatusInternalServerError, Message: "Cannot connec to db", Reason: PG_ERROR_CONNECT}
+	}
+	updateResult := db.Model(&model.User{}).Where("user_id= ?", userId).Updates(updateUser)
+	updateError := updateResult.Error
+	if updateError != nil {
+		getLogger().Error(fmt.Sprintf("Cannot update user %s", updateError.Error()))
+		return transferObject.UserUpdateBody{}, DatabaseStatus{Code: http.StatusConflict, Message: updateError.Error(), Reason: PG_ERROR_GENERIC}
+	}
+	updateCount := updateResult.RowsAffected
+	if updateCount == 0 {
+		getLogger().Error("Cannot update user: No user found")
+		return transferObject.UserUpdateBody{}, DatabaseStatus{Code: http.StatusNotFound, Message: "No record found", Reason: PG_ERROR_GENERIC}
+	}
+	return updateUser, DatabaseStatus{Code: http.StatusOK, Message: "Success", Reason: PG_SUCCESS}
 }
 
 func GetUserByUsernameAndPassword(username string, password string) (user model.User, status DatabaseStatus) {
