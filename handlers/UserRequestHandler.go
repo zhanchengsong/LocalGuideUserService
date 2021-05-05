@@ -63,15 +63,15 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	err := validateRegistrationRequest(*user)
 	if err != nil {
 		getLogger().Error(fmt.Sprintf("Error when creating user: %s", err.Error()))
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: err.Error(), Reason: "validation"})
 		return
 	}
 	savedUser, status := postgres.SaveUser(*user)
 	if status.Code != http.StatusCreated {
 		getLogger().Error(fmt.Sprintf("Error when creating user: %s", status.Message))
-		w.Header().Add("content-type", "application/json")
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status.Code)
 		json.NewEncoder(w).Encode(handlerError{Message: status.Message, Reason: status.Reason})
 		return
@@ -81,16 +81,16 @@ func CreateUser(w http.ResponseWriter, r *http.Request) {
 	jwt, rt, err := TokenizeUser(savedUser)
 	if err != nil {
 		getLogger().Error(fmt.Sprintf("Cannot compute jwt token %s", err.Error()))
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: "Cannot compute jwt token", Reason: err.Error()})
 		return
 	}
 
 	savedUser.JWTToken = jwt
 	savedUser.RefreshToken = rt
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status.Code)
-	w.Header().Add("content-type", "application/json")
 	json.NewEncoder(w).Encode(savedUser)
 	elapsed := time.Since(start).Milliseconds()
 	getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
@@ -113,8 +113,8 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	getLogger().Info("Handling update user")
 	userId := r.URL.Query()["userId"][0]
 	if userId == "" {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: "Missing userId in path", Reason: "parameter"})
 		return
 	}
@@ -123,13 +123,13 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	updateResult, status := postgres.UpdateUser(*updateUser, userId)
 	if status.Code != http.StatusOK {
 		getLogger().Error(fmt.Sprintf("Error when updating user: %s", status.Message))
-		w.Header().Add("content-type", "application/json")
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status.Code)
 		json.NewEncoder(w).Encode(handlerError{Message: status.Message, Reason: status.Reason})
 		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Header().Add("content-type", "application/json")
 	json.NewEncoder(w).Encode(updateResult)
 	elapsed := time.Since(start).Milliseconds()
 	getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
@@ -155,8 +155,9 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 	fetchedUser, status := postgres.GetUserByUsernameAndPassword(login.Username, login.Password)
 	if status.Code != http.StatusOK {
 		getLogger().Error(fmt.Sprintf("Error when logining user %s", status.Message))
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status.Code)
-		w.Header().Add("content-type", "application/json")
+
 		json.NewEncoder(w).Encode(handlerError{Message: status.Message, Reason: status.Reason})
 		return
 	}
@@ -164,16 +165,18 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 	jwt, rt, err := TokenizeUser(fetchedUser)
 	if err != nil {
 		getLogger().Error(fmt.Sprintf("Cannot compute jwt token %s", err.Error()))
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: "Cannot compute jwt token", Reason: err.Error()})
 		return
 	}
 
 	fetchedUser.JWTToken = jwt
 	fetchedUser.RefreshToken = rt
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Header().Add("content-type", "application/json")
 	json.NewEncoder(w).Encode(fetchedUser)
 	elapsed := time.Since(start).Milliseconds()
 	getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
@@ -206,8 +209,9 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		getLogger().Error(err.Error())
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
-		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: "Error parsing refresh token", Reason: "Refresh Token"})
 		return
 	}
@@ -216,28 +220,32 @@ func RefreshToken(w http.ResponseWriter, r *http.Request) {
 		user, status := postgres.GetUserByUserId(userId)
 		if status.Code != http.StatusOK {
 			getLogger().Error(status.Message)
+
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
-			w.Header().Add("content-type", "application/json")
 			json.NewEncoder(w).Encode(handlerError{Message: "Error parsing refresh token", Reason: "Refresh Token"})
 			return
 		}
 		jwtToken, rt, err := TokenizeUser(user)
 		if err != nil {
 			getLogger().Error(err.Error())
+
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusForbidden)
-			w.Header().Add("content-type", "application/json")
 			json.NewEncoder(w).Encode(handlerError{Message: "Error parsing refresh token", Reason: "Refresh Token"})
 			return
 		}
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(TokenResponseBody{JWTToken: jwtToken, RefreshToken: rt})
 		elapsed := time.Since(start).Milliseconds()
 		getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
 	} else {
 		getLogger().Error("cannot parse jwt claims")
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
-		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: "Error parsing claims", Reason: "Refresh Token"})
 	}
 }
@@ -260,16 +268,18 @@ func FindUserByUsername(w http.ResponseWriter, r *http.Request) {
 
 	if status.Code != http.StatusOK {
 		getLogger().Error(fmt.Sprintf("Error when finding user %s", status.Message))
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status.Code)
-		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: status.Message, Reason: status.Reason})
 		return
 	}
 	for i := range users {
 		users[i].Password = ""
 	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Header().Add("content-type", "application/json")
 	json.NewEncoder(w).Encode(UsersResponseBody{Users: users})
 	elapsed := time.Since(start).Milliseconds()
 	getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
@@ -290,8 +300,9 @@ func CountByUsername(w http.ResponseWriter, r *http.Request) {
 	getLogger().Info("Counting user by username")
 	username := r.URL.Query()["username"][0]
 	if len(username) == 0 {
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: "displayName not in param", Reason: "MISSING_PARAM"})
 	}
 	username = strings.TrimSpace(username)
@@ -299,13 +310,15 @@ func CountByUsername(w http.ResponseWriter, r *http.Request) {
 
 	if status.Code != http.StatusOK {
 		getLogger().Error(fmt.Sprintf("Error when searching username %s", status.Message))
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status.Code)
-		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: status.Message, Reason: status.Reason})
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Header().Add("content-type", "application/json")
 	json.NewEncoder(w).Encode(UserCountResponseBody{Count: count})
 	elapsed := time.Since(start).Milliseconds()
 	getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
@@ -326,8 +339,9 @@ func CountByDisplayName(w http.ResponseWriter, r *http.Request) {
 	getLogger().Info("Counting user by displayName")
 	dname := r.URL.Query()["displayName"][0]
 	if len(dname) == 0 {
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: "displayName not in param", Reason: "MISSING_PARAM"})
 		return
 	}
@@ -336,13 +350,15 @@ func CountByDisplayName(w http.ResponseWriter, r *http.Request) {
 
 	if status.Code != http.StatusOK {
 		getLogger().Error(fmt.Sprintf("Error when searching displayName %s", status.Message))
+
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status.Code)
-		w.Header().Add("content-type", "application/json")
 		json.NewEncoder(w).Encode(handlerError{Message: status.Message, Reason: status.Reason})
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Header().Add("content-type", "application/json")
 	json.NewEncoder(w).Encode(UserCountResponseBody{Count: count})
 	elapsed := time.Since(start).Milliseconds()
 	getLogger().Info(fmt.Sprintf("Request handled in %d ms", elapsed))
